@@ -35,7 +35,8 @@ class MBPP(torch.utils.data.Dataset):
         full_tokenized = self.tokenizer(full, 
                 max_length = self.max_length, 
                 padding = 'max_length', 
-                return_tensors = 'pt'
+                return_tensors = 'pt',
+                truncation=True, 
                 )
 
         return full_tokenized 

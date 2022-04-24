@@ -1,0 +1,34 @@
+"""
+Using sympy, solve -42*r + 27*c = -1167 and 130*r + 4*c = 372 for r. 
+"""
+from sympy import Symbol, solve
+
+r = Symbol('r')
+c = Symbol('c')
+
+solution = solve([-42*r + 27*c + 1167, 130*r + 4*c - 372], [r, c])
+
+answer = solution[r]
+
+
+"""
+Calculate -841880142.544 + 411127.
+"""
+answer = -841880142.544 + 411127
+
+
+"""
+Let u(n) = -n**3 - n**2. Let e(c) = -2*c**3 + c. Let l(j) = -118*e(j) + 54*u(j). What is the derivative of l(a)?
+"""
+from sympy import Symbol, diff
+
+n = Symbol('n')
+c = Symbol('c')
+j = Symbol('j')
+a = Symbol('a')
+
+u = -n**3 - n**2
+e = -2*c**3 + c
+l = -118*e + 54*u
+
+answer = diff(l, a)

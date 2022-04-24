@@ -1,3 +1,8 @@
+# Model weights
+*.pt
+*.bin
+*.pth
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

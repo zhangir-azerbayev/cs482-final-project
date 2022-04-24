@@ -17,7 +17,7 @@ Knowledge transfer works as follows: we do zero-shot learning on the entire trai
 |CodeNet 350M| Codex | Knowledge Transfer | ? | 
 
 ## Expert Iteration
-We seek to find out whether our small model can "climb the hill", that is, solve hard problems by learning to solve easier ones. The way we do this is using expert iteration, first introduced in [Silver et al. (2017](https://arxiv.org/abs/1712.01815), where a model trains on previously successful trajectories. 
+We seek to find out whether our small model can "climb the hill", that is, solve hard problems by learning to solve easier ones. The way we do this is using expert iteration, first introduced in [Silver et al. (2017)](https://arxiv.org/abs/1712.01815), where a model trains on previously successful trajectories. 
 
 [Chart showing that problem length is a good proxy for problem difficulty]
 

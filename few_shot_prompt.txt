@@ -32,3 +32,17 @@ e = -2*c**3 + c
 l = -118*e + 54*u
 
 answer = diff(l, a)
+
+
+"""
+Four letters are picked without replacement from {e: 5, g:2, k: 8}. What is prob of picking 4 e?
+"""
+from math import factorial
+n = 5 + 2 + 8 
+
+prob_1 = 5/n
+prob_2 = 4/(n-1)
+prob_3 = 3/(n -2)
+prob_4 = 2/(n -1)
+
+answer = prob_1 * prob_2 * prob_3 * prob_4

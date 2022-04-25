@@ -4,10 +4,16 @@ import torch
 def sort_mbpp(): 
     with open('./raw_mbpp.jsonl') as f: 
         mbpp = [json.loads(line) for line in f]
-    
+    # There is something wrong with task id 170
+    for i,x in enumerate(mbpp): 
+        if x["task_id"] in [170, 649]: 
+            mbpp.pop(i)
+
+    # adds END token
     for i,_ in enumerate(mbpp): 
         mbpp[i]["code"] = mbpp[i]["code"] + "\nEND"
-
+    
+    # sorts
     key = lambda x: x["code"].count('\n')
 
     sorted_mbpp = sorted(mbpp, key=key)
@@ -15,11 +21,6 @@ def sort_mbpp():
     with open("./sorted_mbpp.json", "w") as f: 
         json.dump(sorted_mbpp, f)
 
-def get_sorted_mbpp(): 
-    with open("sorted_mbpp.json", "r") as f: 
-        data = json.load(f)
-
-    return data
 
 
 class MBPP(torch.utils.data.Dataset): 

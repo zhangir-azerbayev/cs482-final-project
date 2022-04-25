@@ -47,11 +47,11 @@ training_args = TrainingArguments(output_dir=output_dir,
 
 
 def data_collator(data):
-        return {'input_ids': torch.stack([f["input_ids"].squeeze() for f in data]),
-                'attention_mask': torch.stack([f["attention_mask"].squeeze() 
+    return {'input_ids': torch.stack([f["input_ids"].squeeze()[1:] for f in data]),
+            'attention_mask': torch.stack([f["attention_mask"].squeeze()[1:]
                     for f in data]), 
-                'labels': torch.stack([f["input_ids"].squeeze() for f in data])
-                }
+            'labels': torch.stack([f["input_ids"].squeeze()[1:] for f in data])
+            }
 
 decay_parameters = get_parameter_names(model, [torch.nn.LayerNorm])
 decay_parameters = [name for name in decay_parameters if "bias" not in name]

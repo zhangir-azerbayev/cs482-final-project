@@ -11,30 +11,31 @@ from tqdm import tqdm
 import torch 
 import torch.nn
 
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers import GPTNeoForCausalLM, GPT2Tokenizer 
-max_text_length = 70
+max_prompt_length = 75
 max_code_length = 300
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+eos = "<|endoftext|>"
 
-tokenizer = GPT2Tokenizer.from_pretrained("EleutherAI/gpt-neo-125M")
-tokenizer.pad_token = tokenizer.eos_token
+tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
+tokenizer.pad_token = "<|endoftext|>"
 
 experiment_name = sys.argv[1]
 model_path = sys.argv[2]
 
-model = GPTNeoForCausalLM.from_pretrained(model_path).to("cuda")
+model = AutoModelForCausalLM.from_pretrained(model_path).to("cuda")
 
 with open("../data/mbpp/sorted_mbpp.json") as f: 
     data_list = json.load(f)
 
-codes = [x["text"] + "\n" + x["header"] for x in data_list[500:510]]
+prompts = [x["text"] + "\n" + x["header"] for x in data_list[500:510]]
 text_lengths = [len(x["text"]) for x in data_list[500:510]]
-print(codes)
-
-inputs = tokenizer(codes, 
+print(prompts)
+inputs = tokenizer(prompts, 
                    return_tensors="pt", 
                    padding='max_length', 
-                   max_length=max_text_length, 
+                   max_length=max_prompt_length, 
                    truncation=True).to('cuda')
 
 outs = model.generate(**inputs, 
@@ -45,7 +46,7 @@ outs = model.generate(**inputs,
                       )
 
 raw_texts = [tokenizer.decode(y) for y in outs]
-texts = [y[l:].replace("<|endoftext|>", "").split("\nEND")[0]
+texts = [y.replace("<|endoftext|>", "").replace("<|", "")[l:].split("\n</cell>")[0]
         for y,l in zip(raw_texts, text_lengths)]
 
 for text in texts: 

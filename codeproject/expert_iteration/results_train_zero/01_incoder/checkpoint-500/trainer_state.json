@@ -10,25 +10,25 @@
     {
       "epoch": 1.0,
       "learning_rate": 2e-05,
-      "loss": 4.0395,
+      "loss": 3.31,
       "step": 125
     },
     {
       "epoch": 2.0,
       "learning_rate": 2e-05,
-      "loss": 0.7505,
+      "loss": 0.7602,
       "step": 250
     },
     {
       "epoch": 3.0,
       "learning_rate": 2e-05,
-      "loss": 0.5947,
+      "loss": 0.6073,
       "step": 375
     }
   ],
   "max_steps": 500,
   "num_train_epochs": 4,
-  "total_flos": 1746433474560000.0,
+  "total_flos": 1731879862272000.0,
   "trial_name": null,
   "trial_params": null
 }

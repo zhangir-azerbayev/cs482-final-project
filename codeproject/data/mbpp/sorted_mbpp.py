@@ -12,7 +12,7 @@ def sort_mbpp():
 
     # adds END token and promp setting
     for i,x in enumerate(mbpp): 
-        mbpp[i]["code"] = mbpp[i]["code"] + "\nEND"
+        mbpp[i]["code"] = mbpp[i]["code"] + "\n</cell>"
         
         re_key = "def.*?:"
         if not re.search(re_key, x["code"]): 

@@ -10,15 +10,18 @@ from transformers import GPTNeoForCausalLM, GPT2Tokenizer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import math
 import os
-from transformers import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from codeproject.expert_iteration.train_zero import data_collator
 from codeproject.expert_iteration.eval_zero import tokens_to_programs
-from codeproject.eval_utils import *
+from codeproject.eval_utils import programs_to_passed_lst
+from torch.optim import AdamW
 
 # Initializing Data 
 with open("../data/mbpp/sorted_mbpp.json") as f: 
     full_data = json.load(f)
+
+for i,_ in enumerate(full_data): 
+    full_data[i]["tests"] = "\n".join(full_data[i]["test_list"])
 
 id_text_lookup = {}
 for x in full_data[500:]: 
@@ -27,21 +30,24 @@ for x in full_data[500:]:
 def make_training_dataset(id_solved_pairs, tokenizer, max_length=120): 
     data_list = [{"text": id_text_lookup[x["task_id"]], 
                   "code": x["solution"]} for x in id_solved_pairs]
+    
+    added_back = full_data[:500] + data_list
 
-    return MBPP(full_data[:500] + data_list, tokenizer, max_length)
+    return MBPP(added_back[:10], tokenizer, max_length)
 
 
 with open("results_eval_zero/01_incoder_checkpoint-500.json") as f: 
     zero_log = json.load(f)
 
-id_solved_pairs = [{k:x[k] for k in ["task_id", "solution"]} for x in zero_log["log"] if x["solution"]]
+id_solved_pairs = [{k:x[k] for k in ["task_id", "solution"]} 
+        for x in zero_log["log"] if x["solution"]]
 #####################################################################################
 # Training function
-def do_train(model, tokenizer, dataset, experiment_name, num_epochs, batch_size, i): 
+def do_mle(model, tokenizer, new_train, experiment_name, num_epochs, batch_size, i): 
+    print(";lasjdf;lsajfd;lk a bunch fow erpowaorwoirja;")
     steps_per_epoch = math.ceil(len(dataset)/batch_size)
 
-    output_dir = f"./results_train_zero/{experiment_name}/MLE{i}"
-    training_args = TrainingArguments(output_dir=output_dir,
+    training_args = TrainingArguments(output_dir=f"./results_train/{experiment_name}/MLE{i}",
                                       num_train_epochs=num_epochs,
                                       per_device_train_batch_size=batch_size,
                                       logging_strategy="epoch",
@@ -65,25 +71,110 @@ def do_train(model, tokenizer, dataset, experiment_name, num_epochs, batch_size,
     optimizer = AdamW(optimizer_grouped_parameters, lr=2e-5)
     lr_lambda = lambda step: 1
     scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
-
-    model = Trainer(model=model, args=training_args, train_dataset=dataset, 
+    """
+    Trainer(model=model, args=training_args, train_dataset=new_train, 
                 data_collator=data_collator, 
                 optimizers=(optimizer, scheduler),
                 ).train()
+    """
 
     return model
 #############################################################################
 def update_id_solved_pairs(model, 
                            tokenizer, 
-                           id_solved_pairs
+                           id_solved_pairs,
+                           experiment_name, 
+                           inference_batch_size, 
+                           num_return_sequences, 
+                           i
                            ): 
+    print("#"*20)
+    print("DOING SAMPLING")
+    print("#"*20)
+    solved_ids = sorted([x["task_id"] for x in id_solved_pairs])
 
+    eval_set = [x for x in full_data[500:] if x["task_id"] not in solve_ids]
+    eval_set = [{k : x[k] for k in ["text", "header", "tests", "task_id"]} 
+            for x in eval_set]
+    eval_loader = DataLoader(eval_set, batch_size=inference_batch_size, 
+            drop_last=False)
+
+    for batch in tqdm(eval_loader): 
+        batch_length = len(batch["text"])
+        text_lengths = [len(x) for x in batch["text"]]
+
+        prompts = [x + "\n" + y for x,y in zip(batch["text"], batch["header"])]
+
+        inputs = tokenizer(prompts, 
+                           max_length=max_prompt_length, 
+                           padding='max_length', 
+                           truncation=True,
+                           return_tensors="pt",
+                           ).to('cuda')
+
+
+        outputs = model.generate(**inputs,
+                                     do_sample=True,
+                                     temperature=temp,
+                                     max_new_tokens = max_code_length,
+                                     pad_token_id=tokenizer.eos_token_id,
+                                     num_return_sequences = num_return_sequences,
+                                    )
+        outputs = torch.reshape(outputs, (batch_length, 
+            num_return_sequences, -1)).to('cpu')
+
+        for out, text_length, tests, task_id in zip(outputs, 
+                text_lengths, batch["tests"], batch["task_id"]): 
+            programs = tokens_to_programs(out, text_length, tokenizer)
+
+            passed_lst = programs_to_passed_lst(programs, tests)
+
+            if True in passed_lst: 
+                solution = programs[passed_lst.index(True)]
+                id_solved_pairs.append({"task_id": task_id, 
+                                        "solution": solution})
+    print("TOTAL NUMBER SOLVED: ", len(id_solved_pairs))
+
+    with (f"results_train/{experiment_name}/S_{i}.json", "w") as f: 
+        json.dump({"num_solved": len(id_solved_pairs), 
+                   "log": id_solved_pairs
+                  },  f)
+    return id_solved_pairs
+
+###################################################################
 # Main Script
+experiment_name = sys.argv[1]
+os.mkdir(f"results_train/{experiment_name}")
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 batch_size = 4
 num_epochs = 2
+number_iterations = 6
+num_return_sequences=20
+inference_batch_size = 6
 
 tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
 tokenizer.pad_token = '<|endoftext|>'
 
+model_path = "facebook/incoder-1B"
+model = AutoModelForCausalLM.from_pretrained(model_path)
 
+for i in range(1, number_iterations+1): 
+    id_solved_pairs = update_id_solved_pairs(model, 
+                                             tokenizer, 
+                                             id_solved_pairs, 
+                                             experiment_name,
+                                             inference_batch_size, 
+                                             num_return_sequences, 
+                                             i
+                                             )
+
+    new_train = make_training_dataset(id_solved_pairs, tokenizer)
+
+    model = do_mle(model, 
+                     tokenizer, 
+                     new_train, 
+                     experiment_name, 
+                     num_epochs, 
+                     batch_size, 
+                     i
+                     )

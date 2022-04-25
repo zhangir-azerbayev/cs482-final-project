@@ -5,6 +5,7 @@ import json
 import math
 import random
 import re
+import numpy as np
 
 from tqdm import tqdm
 
@@ -16,13 +17,16 @@ from transformers import GPTNeoForCausalLM, GPT2Tokenizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from codeproject.execution import check_correctness
+
 max_prompt_length = 75
 max_code_length = 300
 temp=0.2
-num_return_sequences=5
-inference_batch_size=2
+num_return_sequences=10
+inference_batch_size=12
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def tokens_to_programs(outs, input_length, tokenizer): 
     l=input_length
@@ -34,16 +38,14 @@ def tokens_to_programs(outs, input_length, tokenizer):
 
     return progs
 
-def programs_to_passed_lst(programs, test_cases): 
-    test_cases_str = "\n".join(test_cases)
-
-    to_execute = programs + "\n" + test_cases_str
+def programs_to_passed_lst(programs, tests): 
+    to_execute = [program + "\n" + tests for program in programs]
 
     passed_lst = [check_correctness(x, 1)["passed"] for x in to_execute]
 
     return passed_lst
 
-def pass_k(lst, k): 
+def pass_at_k(lst, k): 
     """
     lst: Boolean list 
     k: value of pass@k to calculate. 
@@ -65,10 +67,16 @@ with open("../data/mbpp/sorted_mbpp.json") as f:
     data_list = json.load(f)
 
 eval_set = data_list[500:]
+# prevents a dataloader fit
+for i, _ in enumerate(eval_set): 
+    eval_set[i]["tests"] = "\n".join(eval_set[i]["test_list"])
+# prevents dataloader bug
+eval_set = [{k : x[k] for k in ["text", "header", "tests", "task_id"]} for x in eval_set]
 
 eval_loader = DataLoader(eval_set, batch_size=inference_batch_size, drop_last=False)
 
-for batch in eval_loader: 
+log = []
+for batch in tqdm(eval_loader): 
     batch_length = len(batch["text"])
     text_lengths = [len(x) for x in batch["text"]]
 
@@ -78,7 +86,9 @@ for batch in eval_loader:
                        max_length=max_prompt_length, 
                        padding='max_length', 
                        truncation=True,
-                       )
+                       return_tensors="pt",
+                       ).to('cuda')
+
 
     outputs = model.generate(**inputs,
                                  do_sample=True,
@@ -87,20 +97,42 @@ for batch in eval_loader:
                                  pad_token_id=tokenizer.eos_token_id,
                                  num_return_sequences = num_return_sequences,
                                 )
-    outputs = torch.reshape(outputs, (batch_length, num_return_sequences, -1))
+    outputs = torch.reshape(outputs, (batch_length, num_return_sequences, -1)).to('cpu')
 
-    for out, text_length, test_cases in zip(outputs, text_lengths, batch["test_cases"]): 
+    for out, text_length, tests, task_id in zip(outputs, text_lengths, batch["tests"], batch["task_id"]): 
         programs = tokens_to_programs(out, text_length, tokenizer)
 
-        passed_lst = programs_to_passed_lst(programs, test_cases)
+        passed_lst = programs_to_passed_lst(programs, tests)
 
         num_success = sum(passed_lst)
+        if num_success > 0: 
+            passed=True
+            solution = programs[passed_lst.index(True)]
+        else: 
+            solution = None
+            passed=False
+
         k = num_return_sequences
+        pass_1 = pass_at_k(passed_lst, 1)
+        pass_k = pass_at_k(passed_lst, k)
 
-        for prog in programs: 
-            print("#"*20)
-            print(program)
-    break
+        to_log = {"task_id": int(task_id.item()), 
+                "pass_1": pass_1, 
+                "pass_k": pass_k, 
+                "k": k, 
+                "num_success": num_success, 
+                "passed": passed, 
+                "solution": solution, 
+                }
+        log.append(to_log)
 
+pass_1s = [x["pass_1"] for x in log]
+pass_1 = sum(pass_1s)/len(pass_1s)
 
+pass_ks = [x["pass_k"] for x in log]
+pass_k = sum(pass_ks)/len(pass_ks)
 
+to_dump = {"pass_1": pass_1, "pass_k": pass_k, "log": log}
+
+with open(f"results_eval_zero/{experiment_name}.json", "w") as f: 
+    json.dump(to_dump, f)

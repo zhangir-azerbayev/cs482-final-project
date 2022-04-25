@@ -7,6 +7,7 @@ import json
 import sys
 from transformers import TrainingArguments, Trainer
 from transformers import GPTNeoForCausalLM, GPT2Tokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import math
 import os
 from transformers import AdamW
@@ -24,17 +25,17 @@ with open("../data/mbpp/sorted_mbpp.json") as f:
     data_list = json.load(f)
     data_list = data_list[:500]
 
-tokenizer = GPT2Tokenizer.from_pretrained("EleutherAI/gpt-neo-125M")
-tokenizer.pad_token = tokenizer.eos_token
+tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
+tokenizer.pad_token = '<|endoftext|>'
 
 dataset = MBPP(data_list, tokenizer, max_length=120)
 
-model = GPTNeoForCausalLM.from_pretrained("EleutherAI/gpt-neo-125M")
+model = AutoModelForCausalLM.from_pretrained("facebook/incoder-1B")
 
-batch_size=32
+batch_size=4
 
-steps_per_epoch = math.ceil(500/batch_size)
-num_epochs=60
+steps_per_epoch = math.ceil(len(data_list)/batch_size)
+num_epochs=4 
 
 output_dir = f"./results_train_zero/{run_name}"
 training_args = TrainingArguments(output_dir=output_dir, 

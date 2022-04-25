@@ -1,11 +1,20 @@
 from codeproject.data.mbpp.sorted_mbpp import MBPP
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch 
+import torch.nn
+from transformers.trainer_pt_utils import get_parameter_names
 import json
 import sys
 from transformers import TrainingArguments, Trainer
 from transformers import GPTNeoForCausalLM, GPT2Tokenizer
 import math
+import os
+from transformers import AdamW
+from torch.optim.lr_scheduler import LambdaLR
+
+
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 
 
@@ -43,8 +52,26 @@ def data_collator(data):
                 'labels': torch.stack([f["input_ids"].squeeze() for f in data])
                 }
 
+decay_parameters = get_parameter_names(model, [torch.nn.LayerNorm])
+decay_parameters = [name for name in decay_parameters if "bias" not in name]
+optimizer_grouped_parameters = [
+        {
+            "params": [p for n, p in model.named_parameters() if n in decay_parameters],
+            "weight_decay": 0.01,
+        },
+        {
+            "params": [p for n, p in model.named_parameters() if n not in decay_parameters],
+            "weight_decay": 0.0,
+        },
+    ]
+
+optimizer = AdamW(optimizer_grouped_parameters, lr=2e-5)
+lr_lambda = lambda step: 1
+scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
+
 Trainer(model=model, args=training_args, train_dataset=dataset, 
-            data_collator=data_collator
+            data_collator=data_collator, 
+            optimizers=(optimizer, scheduler),
             ).train()
 
 

@@ -1,5 +1,6 @@
 import json
 import torch
+import re
 
 def sort_mbpp(): 
     with open('./raw_mbpp.jsonl') as f: 
@@ -9,9 +10,16 @@ def sort_mbpp():
         if x["task_id"] in [170, 649]: 
             mbpp.pop(i)
 
-    # adds END token
-    for i,_ in enumerate(mbpp): 
+    # adds END token and promp setting
+    for i,x in enumerate(mbpp): 
         mbpp[i]["code"] = mbpp[i]["code"] + "\nEND"
+        
+        re_key = "def.*?:"
+        if not re.search(re_key, x["code"]): 
+            print(repr(x["code"]))
+        header = x["code"][:re.search(re_key, x["code"]).span()[1]]
+        mbpp[i]["prompt"] = x["text"] + "\n" + header
+
     
     # sorts
     key = lambda x: x["code"].count('\n')

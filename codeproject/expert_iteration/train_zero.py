@@ -34,12 +34,12 @@ model = GPTNeoForCausalLM.from_pretrained("EleutherAI/gpt-neo-125M")
 batch_size=32
 
 steps_per_epoch = math.ceil(500/batch_size)
-num_epochs=20
+num_epochs=60
 
 output_dir = f"./results_train_zero/{run_name}"
 training_args = TrainingArguments(output_dir=output_dir, 
                                       num_train_epochs=num_epochs,
-                                      per_device_train_batch_size=steps_per_epoch, 
+                                      per_device_train_batch_size=batch_size, 
                                       logging_strategy="epoch",
                                       save_steps=steps_per_epoch*num_epochs,
                                       )

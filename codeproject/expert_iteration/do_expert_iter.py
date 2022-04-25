@@ -16,32 +16,7 @@ from codeproject.expert_iteration.eval_zero import tokens_to_programs
 from codeproject.eval_utils import programs_to_passed_lst
 from torch.optim import AdamW
 
-# Initializing Data 
-with open("../data/mbpp/sorted_mbpp.json") as f: 
-    full_data = json.load(f)
 
-for i,_ in enumerate(full_data): 
-    full_data[i]["tests"] = "\n".join(full_data[i]["test_list"])
-
-id_text_lookup = {}
-for x in full_data[500:]: 
-    id_text_lookup[x["task_id"]] = x["text"]
-
-def make_training_dataset(id_solved_pairs, tokenizer, max_length=120): 
-    data_list = [{"text": id_text_lookup[x["task_id"]], 
-                  "code": x["solution"]} for x in id_solved_pairs]
-    
-    added_back = full_data[:500] + data_list
-
-    return MBPP(added_back[:10], tokenizer, max_length)
-
-
-with open("results_eval_zero/01_incoder_checkpoint-500.json") as f: 
-    zero_log = json.load(f)
-
-id_solved_pairs = [{k:x[k] for k in ["task_id", "solution"]} 
-        for x in zero_log["log"] if x["solution"]]
-#####################################################################################
 # Training function
 def do_mle(model, tokenizer, new_train, experiment_name, num_epochs, batch_size, i): 
     print(";lasjdf;lsajfd;lk a bunch fow erpowaorwoirja;")
@@ -79,7 +54,9 @@ def do_mle(model, tokenizer, new_train, experiment_name, num_epochs, batch_size,
     """
 
     return model
-#############################################################################
+
+
+
 def update_id_solved_pairs(model, 
                            tokenizer, 
                            id_solved_pairs,
@@ -141,40 +118,69 @@ def update_id_solved_pairs(model,
                   },  f)
     return id_solved_pairs
 
-###################################################################
+
 # Main Script
-experiment_name = sys.argv[1]
-os.mkdir(f"results_train/{experiment_name}")
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-batch_size = 4
-num_epochs = 2
-number_iterations = 6
-num_return_sequences=20
-inference_batch_size = 6
+with open("../data/mbpp/sorted_mbpp.json") as f: 
+    full_data = json.load(f)
 
-tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
-tokenizer.pad_token = '<|endoftext|>'
+for i,_ in enumerate(full_data): 
+    full_data[i]["tests"] = "\n".join(full_data[i]["test_list"])
 
-model_path = "facebook/incoder-1B"
-model = AutoModelForCausalLM.from_pretrained(model_path)
+id_text_lookup = {}
+for x in full_data[500:]: 
+    id_text_lookup[x["task_id"]] = x["text"]
 
-for i in range(1, number_iterations+1): 
-    id_solved_pairs = update_id_solved_pairs(model, 
-                                             tokenizer, 
-                                             id_solved_pairs, 
-                                             experiment_name,
-                                             inference_batch_size, 
-                                             num_return_sequences, 
-                                             i
-                                             )
+def make_training_dataset(id_solved_pairs, tokenizer, max_length=120): 
+    data_list = [{"text": id_text_lookup[x["task_id"]], 
+                  "code": x["solution"]} for x in id_solved_pairs]
+    
+    added_back = full_data[:500] + data_list
 
-    new_train = make_training_dataset(id_solved_pairs, tokenizer)
+    return MBPP(added_back[:10], tokenizer, max_length)
 
-    model = do_mle(model, 
-                     tokenizer, 
-                     new_train, 
-                     experiment_name, 
-                     num_epochs, 
-                     batch_size, 
-                     i
-                     )
+def main(): 
+    with open("results_eval_zero/01_incoder_checkpoint-500.json") as f: 
+        zero_log = json.load(f)
+
+    id_solved_pairs = [{k:x[k] for k in ["task_id", "solution"]} 
+            for x in zero_log["log"] if x["solution"]]
+
+
+    experiment_name = sys.argv[1]
+    os.mkdir(f"results_train/{experiment_name}")
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    batch_size = 4
+    num_epochs = 2
+    number_iterations = 6
+    num_return_sequences=20
+    inference_batch_size = 6
+
+    tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
+    tokenizer.pad_token = '<|endoftext|>'
+
+    model_path = "facebook/incoder-1B"
+    model = AutoModelForCausalLM.from_pretrained(model_path)
+
+    for i in range(1, number_iterations+1): 
+        id_solved_pairs = update_id_solved_pairs(model, 
+                                                 tokenizer, 
+                                                 id_solved_pairs, 
+                                                 experiment_name,
+                                                 inference_batch_size, 
+                                                 num_return_sequences, 
+                                                 i
+                                                 )
+
+        new_train = make_training_dataset(id_solved_pairs, tokenizer)
+
+        model = do_mle(model, 
+                         tokenizer, 
+                         new_train, 
+                         experiment_name, 
+                         num_epochs, 
+                         batch_size, 
+                         i
+                         )
+
+if __name__=="__main__": 
+    main()

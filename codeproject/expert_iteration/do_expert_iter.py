@@ -11,8 +11,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import math
 import os
 from torch.optim.lr_scheduler import LambdaLR
-from codeproject.expert_iteration.train_zero import data_collator
-from codeproject.expert_iteration.eval_zero import tokens_to_programs
+from codeproject.expert_iteration.utils import data_collator, tokens_to_programs
 from codeproject.eval_utils import programs_to_passed_lst
 from torch.optim import AdamW
 

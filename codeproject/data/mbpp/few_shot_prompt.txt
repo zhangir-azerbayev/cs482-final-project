@@ -20,3 +20,5 @@ def heap_queue_largest(nums,n):
     largest_nums = hq.nlargest(n, nums)
     return largest_nums
 [END]
+
+You are an expert Python programmer, and here is your task:

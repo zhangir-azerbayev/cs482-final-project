@@ -1,3 +1,5 @@
+import torch
+
 def tokens_to_programs(outs, input_length, tokenizer): 
     l=input_length
 

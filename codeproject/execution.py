@@ -1,5 +1,3 @@
-# Basically copied from https://github.com/openai/human-eval/blob/master/human_eval/execution.py
-
 from typing import Optional, Callable, Dict
 import ast
 import contextlib
@@ -12,54 +10,49 @@ import signal
 import tempfile
 
 
-def semisafe_evaluate(completion: str, key : str, timeout : float):
+def check_correctness(program, timeout) -> Dict:
     """
-    Evaluates a code completion with some added safety features. 
+    Evaluates the functional correctness of a completion by running the test
+    suite provided in the problem. 
 
-    Returns a float if code succesfully executes. Returns a string describing 
-    error if code is unsuccesfull. 
+    :param completion_id: an optional completion ID so we can match
+        the results later even if execution finishes asynchronously.
     """
+    def unsafe_execute():
+            with create_tempdir():
+                # These system calls are needed when cleaning up tempdir.
+                import os
+                import shutil
+                rmtree = shutil.rmtree
+                rmdir = os.rmdir
+                chdir = os.chdir
 
-    def semisafe_execute():
+                # Disable functionalities that can make destructive changes to the test.
+                reliability_guard()
 
-        with create_tempdir():
+                # Construct the check program and run it.
+                check_program = program
 
-            # These system calls are needed when cleaning up tempdir.
-            import os
-            import shutil
-            rmtree = shutil.rmtree
-            rmdir = os.rmdir
-            chdir = os.chdir
+                try:
+                    exec_globals = {}
+                    with swallow_io():
+                        with time_limit(timeout):
+                            exec(program, exec_globals)
+                    result.append("passed")
+                except TimeoutException:
+                    result.append("timed out")
+                except BaseException as e:
+                    result.append(f"failed: {e}")
 
-            # Disable functionalities that can make destructive changes to the test.
-            reliability_guard()
-
-            # Construct the check program and run it.
-
-            try:
-                exec_globals = {}
-                with swallow_io():
-                    with time_limit(timeout):
-                         exec(completion, exec_globals)
-                print("keys", exec_globals.keys())
-                if key in exec_globals.keys(): 
-                    result.append(exec_globals[key])
-                else: 
-                    result.append("failed: answer not computed")
-            except TimeoutException:
-                result.append("failed: timed out")
-            except BaseException as e:
-                result.append(f"failed: {e}")
-
-            # Needed for cleaning up.
-            shutil.rmtree = rmtree
-            os.rmdir = rmdir
-            os.chdir = chdir
+                # Needed for cleaning up.
+                shutil.rmtree = rmtree
+                os.rmdir = rmdir
+                os.chdir = chdir
 
     manager = multiprocessing.Manager()
     result = manager.list()
 
-    p = multiprocessing.Process(target=semisafe_execute)
+    p = multiprocessing.Process(target=unsafe_execute)
     p.start()
     p.join(timeout=timeout + 1)
     if p.is_alive():
@@ -68,7 +61,10 @@ def semisafe_evaluate(completion: str, key : str, timeout : float):
     if not result:
         result.append("timed out")
 
-    return result[0]
+    return dict(
+        passed=result[0] == "passed",
+        result=result[0],
+    )
 
 
 @contextlib.contextmanager
@@ -144,6 +140,7 @@ def reliability_guard(maximum_memory_bytes: Optional[int] = None):
     This disables various destructive functions and prevents the generated code
     from interfering with the test (e.g. fork bomb, killing other processes,
     removing filesystem files, etc.)
+
     WARNING
     This function is NOT a security sandbox. Untrusted code, including, model-
     generated code, should not be blindly executed outside of one. See the 
@@ -202,9 +199,8 @@ def reliability_guard(maximum_memory_bytes: Optional[int] = None):
 
     import subprocess
     subprocess.Popen = None  # type: ignore
-    
-    # Next line causes an error for some reason. 
-    #__builtins__['help'] = None
+
+    __builtins__['help'] = None
 
     import sys
     sys.modules['ipdb'] = None
@@ -212,4 +208,3 @@ def reliability_guard(maximum_memory_bytes: Optional[int] = None):
     sys.modules['resource'] = None
     sys.modules['psutil'] = None
     sys.modules['tkinter'] = None
-

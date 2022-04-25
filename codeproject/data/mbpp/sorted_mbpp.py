@@ -18,7 +18,7 @@ def sort_mbpp():
         if not re.search(re_key, x["code"]): 
             print(repr(x["code"]))
         header = x["code"][:re.search(re_key, x["code"]).span()[1]]
-        mbpp[i]["prompt"] = x["text"] + "\n" + header
+        mbpp[i]["header"] = header
 
     
     # sorts

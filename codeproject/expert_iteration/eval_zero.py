@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from codeproject.execution import check_correctness
+from codeproject.eval_utils import programs_to_passed_lst, pass_at_k
 
 max_prompt_length = 75
 max_code_length = 300
@@ -38,22 +39,6 @@ def tokens_to_programs(outs, input_length, tokenizer):
 
     return progs
 
-def programs_to_passed_lst(programs, tests): 
-    to_execute = [program + "\n" + tests for program in programs]
-
-    passed_lst = [check_correctness(x, 1)["passed"] for x in to_execute]
-
-    return passed_lst
-
-def pass_at_k(lst, k): 
-    """
-    lst: Boolean list 
-    k: value of pass@k to calculate. 
-    """
-    n = len(lst)
-    c = sum(lst)
-    if n - c < k: return 1.0 
-    return 1.0 - np.prod(1.0 - k / np.arange(n-c+1, n+1))
 
 tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
 tokenizer.pad_token = "<|endoftext|>"

@@ -29,6 +29,26 @@ def sort_mbpp():
     with open("./sorted_mbpp.json", "w") as f: 
         json.dump(sorted_mbpp, f)
 
+def split_mbpp(): 
+    with open('./raw_mbpp.jsonl') as f: 
+        mbpp = [json.loads(line) for line in f]
+    # adds header
+    for i,x in enumerate(mbpp):  
+        re_key = "def.*?:"
+        if not re.search(re_key, x["code"]): 
+            print(repr(x["code"]))
+        header = x["code"][:re.search(re_key, x["code"]).span()[1]]
+        mbpp[i]["header"] = header
+
+    train = mbpp[:900]
+    test = mbpp[900:]
+
+    with open("mbpp_train.json", "w") as f: 
+        json.dump(train, f)
+    
+    with open("mbpp_test.json", "w") as f: 
+        json.dump(test, f)
+
 
 
 class MBPP(torch.utils.data.Dataset): 
@@ -54,4 +74,4 @@ class MBPP(torch.utils.data.Dataset):
         return len(self.data)
 
 if __name__=="__main__": 
-    sort_mbpp()
+    split_mbpp()
